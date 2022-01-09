@@ -23,6 +23,8 @@ namespace gps {
         //yaw - camera rotation around the y axis
         //pitch - camera rotation around the x axis
         void rotate(float pitch, float yaw);
+        //get camera position
+        glm::vec3 getCameraPosition();
         
     private:
         glm::vec3 cameraPosition;
