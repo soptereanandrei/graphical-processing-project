@@ -4,11 +4,11 @@ namespace gps {
 
 	void Model3D::LoadModel(std::string fileName)
 	{
-        std::string basePath = fileName.substr(0, fileName.find_last_of('/')) + "/";
+		std::string basePath = fileName.substr(0, fileName.find_last_of('/')) + "/";
 		ReadOBJ(fileName, basePath);
 	}
 
-    void Model3D::LoadModel(std::string fileName, std::string basePath)
+	void Model3D::LoadModel(std::string fileName, std::string basePath)
 	{
 		ReadOBJ(fileName, basePath);
 	}
@@ -21,9 +21,9 @@ namespace gps {
 	}
 
 	// Does the parsing of the .obj file and fills in the data structure
-	void Model3D::ReadOBJ(std::string fileName, std::string basePath){
+	void Model3D::ReadOBJ(std::string fileName, std::string basePath) {
 
-        std::cout << "Loading : " << fileName << std::endl;
+		std::cout << "Loading : " << fileName << std::endl;
 		tinyobj::attrib_t attrib;
 		std::vector<tinyobj::shape_t> shapes;
 		std::vector<tinyobj::material_t> materials;
@@ -95,7 +95,7 @@ namespace gps {
 			// get material id
 			// Only try to read materials if the .mtl file is present
 			int a = shapes[s].mesh.material_ids.size();
-			if (a > 0 && materials.size()>0) {
+			if (a > 0 && materials.size() > 0) {
 				materialId = shapes[s].mesh.material_ids[0];
 				if (materialId != -1) {
 					gps::Material currentMaterial;
@@ -139,23 +139,23 @@ namespace gps {
 	// Retrieves a texture associated with the object - by its name and type
 	gps::Texture Model3D::LoadTexture(std::string path, std::string type) {
 
-			for (int i = 0; i < loadedTextures.size(); i++) {
-				if (loadedTextures[i].path == path)
-				{
-					//already loaded texture
-					return loadedTextures[i];
-				}
+		for (int i = 0; i < loadedTextures.size(); i++) {
+			if (loadedTextures[i].path == path)
+			{
+				//already loaded texture
+				return loadedTextures[i];
 			}
-
-			gps::Texture currentTexture;
-			currentTexture.id = ReadTextureFromFile(path.c_str());
-			currentTexture.type = std::string(type);
-			currentTexture.path = path;
-
-			loadedTextures.push_back(currentTexture);
-
-			return currentTexture;
 		}
+
+		gps::Texture currentTexture;
+		currentTexture.id = ReadTextureFromFile(path.c_str());
+		currentTexture.type = std::string(type);
+		currentTexture.path = path;
+
+		loadedTextures.push_back(currentTexture);
+
+		return currentTexture;
+	}
 
 	// Reads the pixel data from an image file and loads it into the video memory
 	GLuint Model3D::ReadTextureFromFile(const char* file_name) {
@@ -174,8 +174,8 @@ namespace gps {
 		}
 
 		int width_in_bytes = x * 4;
-		unsigned char *top = NULL;
-		unsigned char *bottom = NULL;
+		unsigned char* top = NULL;
+		unsigned char* bottom = NULL;
 		unsigned char temp = 0;
 		int half_height = y / 2;
 
@@ -214,6 +214,36 @@ namespace gps {
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 		return textureID;
+	}
+
+	void Model3D::rotateMesh(int meshIndex, glm::vec3 center, float angle, glm::vec3 axis)
+	{
+		if (meshIndex < 0 || meshIndex > meshes.size())
+		{
+			std::cout << "Mesh index out of range";
+			return;
+		}
+
+		glm::mat4 transforms = glm::translate(glm::mat4(1.0f), center);
+		transforms = glm::rotate(transforms, glm::radians(angle), axis);
+		transforms = glm::translate(transforms, -center);
+
+		gps::Mesh mesh = meshes.at(meshIndex);
+		std::vector<gps::Vertex> newVertices;
+		for (int i = 0; i < mesh.vertices.size(); i++)
+		{
+			glm::vec3 newPosition = transforms * glm::vec4(mesh.vertices[i].Position, 1.0);
+			gps::Vertex newVertex;
+			newVertex.Position = newPosition;
+			newVertex.Normal = mesh.vertices[i].Normal;
+			newVertex.TexCoords = mesh.vertices[i].TexCoords;
+			newVertices.push_back(newVertex);
+		}
+		
+		meshes.erase(meshes.begin() + meshIndex);
+		gps::Mesh newMesh(newVertices, mesh.indices, mesh.textures);
+
+		meshes.insert(meshes.begin() + meshIndex, newMesh);
 	}
 
 	Model3D::~Model3D() {

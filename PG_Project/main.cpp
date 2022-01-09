@@ -24,8 +24,8 @@
 #include "Model3D.hpp"
 #include "Mesh.hpp"
 
-int glWindowWidth = 640;
-int glWindowHeight = 480;
+int glWindowWidth = 1024;
+int glWindowHeight = 820;
 int retina_width, retina_height;
 GLFWwindow* glWindow = NULL;
 
@@ -41,22 +41,53 @@ GLint projectionLoc;
 glm::vec3 camPosition = glm::vec3(0.0f, 2.0f, 5.0f);
 glm::vec3 camTarget = glm::vec3(0.0f, 2.0f, -10.0f);
 
-gps::Camera myCamera(glm::vec3(0.0f, 5.0f, 15.0f), glm::vec3(0.0f, 2.0f, -10.0f), glm::vec3(0, 1, 0));
+gps::Camera myCamera(glm::vec3(0.0f, 10.0f, 30.0f), glm::vec3(0.0f, 2.0f, -10.0f), glm::vec3(0, 1, 0));
 float cameraSpeed = 0.01f;
 
 bool pressedKeys[1024];
 float angle = 0.0f;
+
+glm::mat3 normalMatrix;
+glm::mat4 lightSpaceMatrix;
+
+gps::Shader lightingShader;
+
+//directional light
+glm::vec3 lightDir(-1.0f, -1.0f, 1.0f);
+//glm::vec3 lightDir(-4.0f, -4.0f, -1.0f);
+GLint lightDirLoc;
+glm::vec3 lightColor(0.3f, 0.3f, 0.3f);
+GLint lightColorLoc;
+glm::vec3 viewPosEye;
+
+//point light
+glm::vec3 pointLightPos(-3.0f, 4.6f, -4.5f);
+glm::vec3 pointLightPosEye;
+GLint pointLightPosEyeLoc;
+glm::vec3 pointLightColor(1.0f, 1.0f, 1.0f);
+GLint pointLightColorLoc;
+
+const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
+
+GLuint depthMapFBO;
+GLuint depthMap;
+gps::Shader depthShader;
+gps::Shader screenQuadShader;
+gps::Model3D screenQuad;
 
 gps::Model3D houseModel;
 gps::Model3D pewterModel;
 gps::Model3D sideboardModel;
 gps::Model3D groundModel;
 gps::Model3D tableModel;
-gps::Model3D door;
+gps::Model3D doorModel;
 gps::Model3D trashCanModel;
 gps::Model3D lightModel;
 
 bool showDepthMap = false;
+
+bool doorOpen = false;
+glm::vec3 centerOfDoor(-19.0f, 2.4f, 2.64f);
 
 GLenum glCheckError_(const char* file, int line) {
 	GLenum errorCode;
@@ -83,8 +114,14 @@ void windowResizeCallback(GLFWwindow* window, int width, int height)
 {
 	fprintf(stdout, "window resized to width: %d , and height: %d\n", width, height);
 	//TODO
+	glWindowWidth = width;
+	glWindowHeight = height;
+	retina_width = width;
+	retina_height = height;
+	glfwSetWindowSize(window, width, height);
 }
 
+void changeDoor();
 void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
@@ -92,6 +129,9 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 
 	if (key == GLFW_KEY_M && action == GLFW_PRESS)
 		showDepthMap = !showDepthMap;
+
+	if (key == GLFW_KEY_F && action == GLFW_PRESS)
+		changeDoor();
 
 	if (key >= 0 && key < 1024)
 	{
@@ -118,7 +158,7 @@ void mouseCallback(GLFWwindow* window, double xpos, double ypos)
 		float yaw = -deltaX * mouseSpeed;
 		myCamera.rotate(pitch, yaw);
 
-		std::cout << "deltaX=" << deltaX << " deltaY=" << deltaY << "\n";
+		//std::cout << "deltaX=" << deltaX << " deltaY=" << deltaY << "\n";
 		//std::cout << pitch << " " << yaw << "\n";
 	}
 }
@@ -160,8 +200,6 @@ void processMovement()
 		camTarget.z += 0.1;
 	}
 }
-
-
 
 GLuint ReadTextureFromFile(const char* file_name) {
 	int x, y, n;
@@ -220,30 +258,6 @@ GLuint ReadTextureFromFile(const char* file_name) {
 
 	return textureID;
 }
-
-//GLuint verticesVBO;
-//GLuint verticesEBO;
-//GLuint objectVAO;
-//GLint texture;
-
-glm::mat3 normalMatrix;
-glm::mat4 lightSpaceMatrix;
-
-gps::Shader lightingShader;
-//glm::vec3 lightDir(0.0f, 1.0f, 1.0f);
-glm::vec3 lightDir(-4.0f, 4.0f, -1.0f);
-GLint lightDirLoc;
-glm::vec3 lightColor(0.3f, 0.3f, 0.3f);
-GLint lightColorLoc;
-glm::vec3 viewPosEye;
-
-const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
-
-GLuint depthMapFBO;
-GLuint depthMap;
-gps::Shader depthShader;
-gps::Shader screenQuadShader;
-gps::Model3D screenQuad;
 
 bool initOpenGLWindow()
 {
@@ -313,7 +327,7 @@ void initObjects()
 	pewterModel.LoadModel("objects\\mirabel_98_pewter\\mirabel_98_pewter.obj", "objects\\mirabel_98_pewter\\");
 	sideboardModel.LoadModel("objects\\Sideboard\\sideboard.obj", "objects\\Sideboard\\");
 	tableModel.LoadModel("objects\\Table\\table.obj", "objects\\Table\\");
-	door.LoadModel("objects\\Door\\door.obj", "objects\\Door\\");
+	doorModel.LoadModel("objects\\Door\\door.obj", "objects\\Door\\");
 	trashCanModel.LoadModel("objects\\TrashCan\\TrashCan.obj", "objects\\TrashCan\\");
 	lightModel.LoadModel("objects\\light\\light.obj", "objects\\light\\");
 	screenQuad.LoadModel("objects/quad/quad.obj");
@@ -325,8 +339,10 @@ void initShaders()
 {
 	lightingShader.loadShader("shaders/shaderStart.vert", "shaders/shaderStart.frag");
 	lightingShader.useShaderProgram();
+	glCheckError();
 	depthShader.loadShader("shaders/depthShader.vert", "shaders/depthShader.frag");
 	depthShader.useShaderProgram();
+	glCheckError();
 	screenQuadShader.loadShader("shaders/screenQuad.vert", "shaders/screenQuad.frag");
 	screenQuadShader.useShaderProgram();
 
@@ -347,12 +363,20 @@ void initUniforms()
 	glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 	glCheckError();
 
+	view = myCamera.getViewMatrix();
 	lightDirLoc = glGetUniformLocation(lightingShader.shaderProgram, "lightDir");
 	glUniform3fv(lightDirLoc, 1, glm::value_ptr(glm::inverseTranspose(glm::mat3(view * model)) * lightDir));
 	glCheckError();
 
 	lightColorLoc = glGetUniformLocation(lightingShader.shaderProgram, "lightColor");
 	glUniform3fv(lightColorLoc, 1, glm::value_ptr(lightColor));
+
+	pointLightPosEye = view * model * glm::vec4(pointLightPos, 1.0f);
+	pointLightPosEyeLoc = glGetUniformLocation(lightingShader.shaderProgram, "lightPosEye");
+	glUniform3fv(pointLightPosEyeLoc, 1, glm::value_ptr(pointLightPosEye));
+
+	pointLightColorLoc = glGetUniformLocation(lightingShader.shaderProgram, "pointLightColor");
+	glUniform3fv(pointLightColorLoc, 1, glm::value_ptr(pointLightColor));;
 
 	glCheckError();
 }
@@ -415,7 +439,7 @@ void renderDepthMap()
 	sideboardModel.Draw(depthShader);
 	groundModel.Draw(depthShader);
 	tableModel.Draw(depthShader);
-	door.Draw(depthShader);
+	doorModel.Draw(depthShader);
 	trashCanModel.Draw(depthShader);
 	lightModel.Draw(depthShader);
 
@@ -468,13 +492,15 @@ void renderObjects()
 	glBindTexture(GL_TEXTURE_2D, depthMap);
 	glUniform1i(shadowMapLoc, 3);
 	
+	pointLightPosEye = view * model * glm::vec4(pointLightPos, 1.0f);
+	glUniform3fv(pointLightPosEyeLoc, 1, glm::value_ptr(pointLightPosEye));
 
 	houseModel.Draw(lightingShader);
 	pewterModel.Draw(lightingShader);
 	sideboardModel.Draw(lightingShader);
 	groundModel.Draw(lightingShader);
 	tableModel.Draw(lightingShader);
-	door.Draw(lightingShader);
+	doorModel.Draw(lightingShader);
 	trashCanModel.Draw(lightingShader);
 	lightModel.Draw(lightingShader);
 
@@ -514,6 +540,24 @@ void renderScene()
 		showShadowMap();
 	else
 		renderObjects();
+}
+
+void changeDoor()
+{
+	doorOpen = !doorOpen;
+
+	if (!doorOpen)
+	{
+		doorModel.rotateMesh(1, centerOfDoor, -90.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+		doorModel.rotateMesh(2, centerOfDoor, -90.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+		std::cout << "Door opening" << "\n";
+	}
+	else
+	{
+		doorModel.rotateMesh(1, centerOfDoor, 90.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+		doorModel.rotateMesh(2, centerOfDoor, 90.0f, glm::vec3(0.0f, 1.0f, 0.0f));
+		std::cout << "Door closing" << "\n";
+	}
 }
 
 int main(int argc, const char * argv[]) {

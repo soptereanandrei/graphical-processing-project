@@ -18,6 +18,8 @@ uniform vec3 lightDir;
 uniform vec3 lightColor;
 uniform vec3 baseColor;
 uniform vec3 viewPosEye;
+uniform vec3 lightPosEye; //point light position in eye coordinates
+uniform vec3 pointLightColor;
 
 //Textures
 uniform sampler2D ambientTexture;
@@ -26,11 +28,54 @@ uniform sampler2D specularTexture;
 uniform sampler2D shadowMap;
 
 vec3 ambient;
-float ambientStrength = 0.2f;
+float ambientStrength = 0.05f;
 vec3 diffuse;
 vec3 specular;
 float specularStrength = 0.5f;
 float shininess = 32.0f;
+
+float constant = 1.0f;
+float linear = 0.22f;
+float quadratic = 0.20f;
+
+float computeFog()
+{
+    float fogDensity = 0.01f;
+    float fragmentDistance = length(positionEye);
+    float fogFactor = exp(-pow(fragmentDistance * fogDensity, 2));
+
+    return clamp(fogFactor, 0.0f, 1.0f);
+}
+
+vec4 BlinnPhongLightingPoint()
+{
+    //compute light direction
+    vec3 lightDirN = normalize(lightPosEye - positionEye.xyz);
+
+    //compute distance to light
+    float dist = length(lightPosEye - positionEye.xyz);
+
+    //compute attenuation
+    float att = 1.0f / (constant + linear * dist + quadratic * (dist * dist));
+
+    //compute ambient light
+    ambient = att * ambientStrength * pointLightColor * texture(ambientTexture, texCoord).rgb;
+
+    //compute diffuse
+    diffuse = att * max(dot(normalEye, lightDirN), 0.0f) * pointLightColor * texture(diffuseTexture, texCoord).rgb;
+
+    //compute specular
+    //compute view direction in eye coordinates
+    vec3 viewDirN = normalize(viewPosEye - positionEye.xyz);
+
+    //compute half vector
+    vec3 halfVector = normalize(lightDirN + viewDirN);
+
+    float specCoeff = pow(max(dot(normalEye, halfVector), 0.0f), shininess);
+    specular = specCoeff * pointLightColor * texture(specularTexture, texCoord).rgb;
+
+    return vec4(min(ambient + diffuse + specular, 1.0), 1.0f);
+}
 
 float computeShadow()
 {
@@ -52,7 +97,7 @@ float computeShadow()
     return shadow;
 }
 
-vec4 BlinnPhongLighting()
+vec4 BlinnPhongLightingDirectional()
 {
     //compute ambient light
     ambient = ambientStrength * lightColor * texture(ambientTexture, texCoord).rgb;
@@ -93,5 +138,14 @@ vec4 BlinnPhongLighting()
 }
 
 void main() {
-    fragmentColour = BlinnPhongLighting();
+    //fragmentColour = BlinnPhongLightingDirectional();
+    //fragmentColour += BlinnPhongLightingPoint();
+    //fragmentColour = min(fragmentColour, 1.0);
+
+    vec4 lightingCol = min(BlinnPhongLightingDirectional() + BlinnPhongLightingPoint(), 1.0);
+    
+    float fogFactor = computeFog();
+    vec4 fogColor = vec4(0.5f, 0.5f, 0.5f, 1.0f);
+
+    fragmentColour = mix(fogColor, lightingCol, fogFactor);
 }

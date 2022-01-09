@@ -10,6 +10,9 @@
 #include <string>
 #include <vector>
 
+#include "glm/glm.hpp"//core glm functionality
+#include "glm/gtc/matrix_transform.hpp"//glm extension for generating common transformation matrices
+
 namespace gps {
 
     class Model3D
@@ -23,6 +26,8 @@ namespace gps {
 		void LoadModel(std::string fileName, std::string basePath);
 
 		void Draw(gps::Shader shaderProgram);
+
+		void rotateMesh(int meshIndex, glm::vec3 center, float angle, glm::vec3 axis);
 
     private:
 		// Component meshes - group of objects

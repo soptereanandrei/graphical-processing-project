@@ -46,7 +46,7 @@ namespace gps {
             default:
                 break;
         }
-        
+        //std::cout << "Position:" << cameraPosition.x << " " << cameraPosition.y << " " << cameraPosition.z << "\n";
     }
 
     //update the camera internal parameters following a camera rotate event
@@ -71,7 +71,7 @@ namespace gps {
                 this->cameraFrontDirection = newCameraFrontDirection;
                 this->cameraRightDirection = newCameraRightDirection;
             }
-            std::cout << "dotVal = " << dotVal << "\n";
+            //std::cout << "dotVal = " << dotVal << "\n";
         }
     }
 
