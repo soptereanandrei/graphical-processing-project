@@ -89,6 +89,8 @@ bool showDepthMap = false;
 bool doorOpen = false;
 glm::vec3 centerOfDoor(-19.0f, 2.4f, 2.64f);
 
+int renderMode = 0;
+
 GLenum glCheckError_(const char* file, int line) {
 	GLenum errorCode;
 	while ((errorCode = glGetError()) != GL_NO_ERROR)
@@ -121,6 +123,32 @@ void windowResizeCallback(GLFWwindow* window, int width, int height)
 	glfwSetWindowSize(window, width, height);
 }
 
+void changeRenderMode()
+{
+	renderMode++;
+	if (renderMode >= 3)
+		renderMode = 0;
+
+	switch (renderMode)
+	{
+
+	case 0:
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		break;
+
+	case 1:
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		break;
+
+	case 2:
+		glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+		break;
+	
+	default:
+		break;
+	}
+}
+
 void changeDoor();
 void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
@@ -132,6 +160,9 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 
 	if (key == GLFW_KEY_F && action == GLFW_PRESS)
 		changeDoor();
+
+	if (key == GLFW_KEY_N && action == GLFW_PRESS)
+		changeRenderMode();
 
 	if (key >= 0 && key < 1024)
 	{
